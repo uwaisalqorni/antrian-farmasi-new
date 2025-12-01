@@ -1,0 +1,258 @@
+<?php
+require_once('../conf/conf.php');
+date_default_timezone_set('Asia/Jakarta');
+
+ 
+if(isset($_GET['p'])) {	 
+
+//kode poli yang ingin ditampilkan
+$poli="'ANA','GIG','IGDk','INT'";
+//jam reset antrian
+$jamreset='23:00:00';
+$tanggal= mktime(date("m"),date("d"),date("Y"));
+
+function sensorNama($nama) {
+  // Pisahkan nama menjadi array kata
+  $kata = explode(" ", $nama);
+
+  // Inisialisasi string hasil sensor
+  $namaDisensor = "";
+  // Loop melalui setiap kata dalam nama
+  foreach ($kata as $k) {
+      $panjangKata = strlen($k);      
+      // Jika panjang kata kurang dari 3, tampilkan seluruh kata tanpa perubahan
+      if ($panjangKata < 3) {
+          $namaDisensor .= $k . " ";
+      } else {
+          // Ambil huruf pertama
+          $hurufPertama = substr($k, 0, 3);
+          
+          // Ambil huruf terakhir
+          $hurufTerakhir = substr($k, -1);          
+          // Buat string sensor yang mengandung huruf pertama, karakter '*' di tengah, dan huruf terakhir
+          $sensor = $hurufPertama . str_repeat('*', $panjangKata - 3) . $hurufTerakhir;
+
+          // Tambahkan kata yang telah disensor ke string hasil
+          $namaDisensor .= $sensor . " ";
+      }
+  }
+
+  // Hapus spasi ekstra di akhir
+  $namaDisensor = rtrim($namaDisensor);
+  return $namaDisensor;
+}
+  
+switch($_GET['p']){	
+
+   
+   case 'pengaturan':
+   $_sql ="select nama_instansi,email from setting";
+   $hasil=bukaquery($_sql);
+   $data = array();
+   while ($r = mysqli_fetch_array ($hasil)){
+      $r['text'] ="Selamat datang di RS ISLAM Gondaglegi || Tubuh Anda Adalah Dokter Yang Terbaik";
+      $data = $r;
+   }  
+   echo json_encode($data);
+   break;
+
+
+   
+   case 'panggil' :
+    $_sql="select RIGHT(antriapotek3.no_resep,4) as no_reg,
+    antriapotek3.status,antriapotek3.no_rawat,pasien.nm_pasien,
+    poliklinik.nm_poli,dokter.nm_dokter 
+    from antriapotek3 inner join pasien inner join reg_periksa inner join poliklinik inner join dokter on 
+    antriapotek3.no_rawat=reg_periksa.no_rawat and reg_periksa.no_rkm_medis=pasien.no_rkm_medis and 
+    reg_periksa.kd_poli=poliklinik.kd_poli and reg_periksa.kd_dokter=dokter.kd_dokter where 
+    antriapotek3.status = '1' LIMIT 1";
+
+      $hasil=bukaquery($_sql);
+      $data = array();
+      while ($r = mysqli_fetch_array ($hasil)){
+        
+      //tambahkan lagi yang ingin di replace    
+      $awalnama = array("TN ", "BY ", "NY ","AN ","NN ","SDR ","N Y ");
+      $replacenama = array("Tuan ", "Bayi ", "Nyonya ","Anak ","Nona ","Saudara ","Nyonya ");
+
+      $awalpoli= array("IGD","THT");
+      $replacepoli= array("I G D","T H T");
+
+      $awaldokter= array("dr ","drg ","dr. "," Sp.PD"," SpPD"," K-PTI"," Sp.B"," FinaCS"," FINASIM"," Sp.S"," Sp.KK"," Sp.KFR"," Sp.A");
+      $replacedokter= array("dokter ","dokter gigi ","dokter "," Spesialis Penyakit Dalam"," Spesialis Penyakit Dalam"," Konsultan Penyakit Tropis dan Infeksi"," Spesialis Bedah"," Fellow of Indonesian Koleks of Surgery"," Fellow of The Indonesian Society of Internal Medicine"," Spesialis Saraf"," Spesialis Kulit dan Kelamin"," spesialis kedokteran fisik dan rehabilitasi"," spesialis anak");
+
+      
+      $r['nm_poli']=str_replace($awalpoli,$replacepoli,$r['nm_poli']);      
+      $r['nm_pasien']=str_replace($awalnama,$replacenama,$r['nm_pasien']);
+      //$r['nm_dokter']=str_replace($awaldokter,$replacedokter,$r['nm_dokter']);       
+      $r['nm_dokter']="";
+	  $data[] = $r;
+       
+      bukaquery2("UPDATE antriapotek3 SET status = '3' WHERE status='2'");
+      bukaquery2("UPDATE antriapotek3 SET status = '2' WHERE no_rawat = '$r[no_rawat]'");
+      } 
+      echo json_encode($data);
+
+break;	
+     
+     
+case 'nonracikan' :    
+ $_sql="select resep_obat.no_resep,resep_obat.no_rawat,pasien.nm_pasien,resep_obat.jam_peresepan,
+ if(resep_obat.jam='00:00:00','',resep_obat.jam) as jam_validasi,
+ if(resep_obat.jam_penyerahan='00:00:00','',resep_obat.jam_penyerahan) as jam_penyerahan,dokter.nm_dokter
+ from resep_obat inner join reg_periksa on resep_obat.no_rawat=reg_periksa.no_rawat 
+ inner join pasien on reg_periksa.no_rkm_medis=pasien.no_rkm_medis 
+ inner join dokter on resep_obat.kd_dokter=dokter.kd_dokter
+ where resep_obat.no_resep not in(select distinct resep_dokter_racikan.no_resep from resep_dokter_racikan) 
+ and resep_obat.jam_penyerahan='00:00:00'  
+ and resep_obat.jam_peresepan<>'00:00:00' and resep_obat.status='ralan' 
+ and resep_obat.tgl_peresepan='".date("Y-m-d", $tanggal)."' and resep_obat.jam_penyerahan='00:00:00' order by resep_obat.jam_peresepan asc";  
+ $hasil=bukaquery($_sql);
+ $data = array();
+ 
+if(mysqli_num_rows($hasil)>0) {
+  while ($row = mysqli_fetch_array($hasil)) {
+    
+      $row['no_resep']=substr($row['no_resep'], -4);
+      $row['nm_pasien']=sensorNama($row['nm_pasien']);
+      $data[] = $row;
+  }
+}
+echo json_encode($data); 
+break;	
+     
+case 'racikan' :    
+ $_sql="select resep_obat.no_resep,resep_obat.no_rawat,pasien.nm_pasien,resep_obat.jam_peresepan,
+ if(resep_obat.jam='00:00:00','',resep_obat.jam) as jam_validasi,
+ if(resep_obat.jam_penyerahan='00:00:00','',resep_obat.jam_penyerahan) as jam_penyerahan,dokter.nm_dokter
+ from resep_obat inner join reg_periksa on resep_obat.no_rawat=reg_periksa.no_rawat 
+ inner join pasien on reg_periksa.no_rkm_medis=pasien.no_rkm_medis 
+ inner join dokter on resep_obat.kd_dokter=dokter.kd_dokter
+ where resep_obat.no_resep in(select distinct resep_dokter_racikan.no_resep from resep_dokter_racikan) 
+ and resep_obat.jam_peresepan<>'00:00:00' and resep_obat.status='ralan' 
+ and resep_obat.tgl_peresepan='".date("Y-m-d", $tanggal)."' and resep_obat.jam_penyerahan='00:00:00' order by resep_obat.jam_peresepan asc";  
+ $hasil=bukaquery($_sql);
+ $data = array();
+ 
+if(mysqli_num_rows($hasil)>0) {
+  while ($row = mysqli_fetch_array($hasil)) {
+    
+      $row['no_resep']=substr($row['no_resep'], -4);
+      $row['nm_pasien']=sensorNama($row['nm_pasien']);
+      $data[] = $row;
+  }
+}  
+ echo json_encode($data); 
+break;	
+     
+
+case 'nomor' :
+  $_sql="select RIGHT(antriapotek3.no_resep,4) as no_reg,
+  antriapotek3.status,antriapotek3.no_rawat,pasien.nm_pasien,
+  poliklinik.nm_poli,dokter.nm_dokter from antriapotek3 inner join pasien 
+  inner join reg_periksa inner join poliklinik inner join dokter on antriapotek3.no_rawat=reg_periksa.no_rawat and 
+  reg_periksa.no_rkm_medis=pasien.no_rkm_medis and reg_periksa.kd_poli=poliklinik.kd_poli and reg_periksa.kd_dokter=dokter.kd_dokter 
+  where  antriapotek3.status > '0' AND antriapotek3.status < '3' LIMIT 1 ";
+  
+   $hasil=bukaquery($_sql);
+   $data = array();
+   
+  if(mysqli_num_rows($hasil)>0) {
+    while ($row = mysqli_fetch_array($hasil)) {
+      
+      $row['nm_pasien']=sensorNama($row['nm_pasien']);
+      $data[] = $row;
+    }
+  } else {
+   $row['kd_poli']='';
+   $row['no_reg']='0000';
+   $row['nm_pasien']='-';
+   $row['nm_dokter']='-';
+   $row['nm_poli']='-';
+   $data[] = $row;
+  
+  }
+   echo json_encode($data); 
+  break;	
+  
+  
+   
+
+case 'list_antrian_farmasi':
+    // Query untuk mengambil data antrian farmasi (racikan dan non-racikan)
+    // Menggabungkan logika dari case 'racikan' dan 'nonracikan' atau mengambil semua yang valid
+    // Kita ambil semua resep yang sudah masuk (jam_peresepan != 0) dan belum diserahkan (jam_penyerahan = 0)
+    // atau bisa disesuaikan dengan kebutuhan user, misal yang sudah validasi.
+    
+
+    // Query ini mengambil data resep obat yang statusnya 'ralan' (rawat jalan) untuk hari ini
+    // Kita ambil juga jam_penyerahan untuk mengetahui status
+    $_sql = "SELECT resep_obat.no_resep, resep_obat.no_rawat, pasien.nm_pasien, 
+             poliklinik.nm_poli, dokter.nm_dokter, resep_obat.jam_peresepan, resep_obat.status,
+             resep_obat.tgl_perawatan, resep_obat.jam ,
+             resep_obat.tgl_penyerahan, resep_obat.jam_penyerahan, resep_obat.tgl_peresepan
+             FROM resep_obat 
+             INNER JOIN reg_periksa ON resep_obat.no_rawat = reg_periksa.no_rawat 
+             INNER JOIN pasien ON reg_periksa.no_rkm_medis = pasien.no_rkm_medis 
+             INNER JOIN poliklinik ON reg_periksa.kd_poli = poliklinik.kd_poli
+             INNER JOIN dokter ON resep_obat.kd_dokter = dokter.kd_dokter
+             WHERE resep_obat.tgl_peresepan = '".date("Y-m-d", $tanggal)."' 
+             AND resep_obat.status = 'ralan'
+             ORDER BY resep_obat.tgl_penyerahan ASC, resep_obat.jam_penyerahan ASC, resep_obat.jam_peresepan DESC";
+
+    $hasil = bukaquery($_sql);
+    $data = array();
+
+    if(mysqli_num_rows($hasil) > 0) {
+        while ($row = mysqli_fetch_array($hasil)) {
+            // Cek apakah racikan atau bukan
+            $is_racikan = false;
+            $cek_racikan = bukaquery("SELECT no_resep FROM resep_dokter_racikan WHERE no_resep = '".$row['no_resep']."'");
+            if(mysqli_num_rows($cek_racikan) > 0) {
+                $is_racikan = true;
+            }
+
+            $row['jenis_resep'] = $is_racikan ? 'Racikan' : 'Non-Racikan';
+            $row['no_resep_full'] = $row['no_resep'];
+            $row['no_resep'] = substr($row['no_resep'], -4); // Ambil 4 digit terakhir untuk antrian
+            // $row['nm_pasien'] = sensorNama($row['nm_pasien']); // Tidak perlu sensor untuk petugas
+            $data[] = $row;
+        }
+    }
+
+    echo json_encode($data);
+    break;
+
+case 'serahkan_obat':
+    $no_resep = $_GET['no_resep'];
+    // Update jam penyerahan menjadi waktu sekarang
+    $update = bukaquery("UPDATE resep_obat SET tgl_penyerahan = NOW(), jam_penyerahan = NOW() WHERE no_resep = '$no_resep'");
+    if($update) {
+        echo json_encode(array('status' => 'success'));
+    } else {
+        echo json_encode(array('status' => 'error'));
+    }
+    break;
+
+case 'simpan_panggil':
+    $no_rawat = $_GET['no_rawat'];
+    $no_resep = $_GET['no_resep'];
+    
+    // Cek apakah sudah ada
+    $cek = bukaquery("SELECT no_rawat FROM antriapotek3 WHERE no_rawat='$no_rawat'");
+    if(mysqli_num_rows($cek) > 0) {
+        // Update status jadi 1 (Waiting to be called)
+        // Kita reset status agar dipanggil ulang oleh TV
+        $update = bukaquery("UPDATE antriapotek3 SET status='1', no_resep='$no_resep' WHERE no_rawat='$no_rawat'");
+    } else {
+        // Insert baru
+        $insert = bukaquery("INSERT INTO antriapotek3 (no_rawat, no_resep, status) VALUES ('$no_rawat', '$no_resep', '1')");
+    }
+    
+    echo json_encode(array('status' => 'success'));
+    break;
+
+}
+
+}
+?>
