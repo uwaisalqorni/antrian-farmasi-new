@@ -497,9 +497,15 @@
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h4 class="fw-bold mb-0 text-dark"><i class="fa fa-list-ul me-2 text-primary"></i> Daftar Antrian</h4>
-                    <button class="btn btn-modern btn-print bg-white shadow-sm" onclick="loadData()">
-                        <i class="fa fa-sync-alt spin-hover"></i> Refresh
-                    </button>
+                    <div class="d-flex gap-2">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+                            <input type="text" id="search-input" class="form-control border-start-0 ps-0" placeholder="Cari nama pasien..." oninput="filterData()">
+                        </div>
+                        <button class="btn btn-modern btn-print bg-white shadow-sm" onclick="loadData()">
+                            <i class="fa fa-sync-alt spin-hover"></i> Refresh
+                        </button>
+                    </div>
                 </div>
 
                 <div class="table-responsive">
@@ -599,6 +605,23 @@
             loadData();
             setInterval(loadData, 15000);
         });
+
+        let allPatients = [];
+
+        function filterData() {
+            const query = $('#search-input').val().toLowerCase();
+            if (!allPatients || !Array.isArray(allPatients)) {
+                renderTable([]);
+                return;
+            }
+            
+            const filtered = allPatients.filter(item => 
+                (item.nm_pasien && item.nm_pasien.toLowerCase().includes(query)) || 
+                (item.no_rawat && item.no_rawat.toLowerCase().includes(query)) ||
+                (item.no_resep && item.no_resep.toLowerCase().includes(query))
+            );
+            renderTable(filtered);
+        }
 
         function updatePrinterUI() {
             const mode = $('#modeBT').is(':checked') ? 'BT' : 'USB';
@@ -841,121 +864,132 @@ Semoga lekas sembuh.
                 type: 'GET',
                 dataType: 'json',
                 success: function(data) {
-                    const tbody = $('#table-antrian tbody');
-                    tbody.empty();
-                    
-                    let total = 0, racikan = 0, nonracikan = 0;
-                    
-                    if (data.length > 0) {
-                        data.forEach(item => {
-                            const isServed = item.jam_penyerahan && item.jam_penyerahan !== '00:00:00';
-                            
-                            if (!isServed) {
-                                total++;
-                                if(item.jenis_resep === 'Racikan') racikan++; else nonracikan++;
-                            }
-                            
-                            const badgeClass = item.jenis_resep === 'Racikan' ? 'status-racikan' : 'status-nonracikan';
-                            const rowClass = isServed ? 'bg-light text-muted' : '';
-                            const btnDoneState = isServed ? 'btn-disabled' : 'btn-done-mobile';
-                            const btnDoneText = isServed ? '<i class="fa fa-check-double"></i>' : '<i class="fa fa-check"></i> Selesai';
-                            const btnDoneAction = isServed ? '' : `onclick="markAsDone('${item.no_resep_full}', '${item.nm_pasien.replace(/'/g, "\\'")}')"`;
-                            
-                            // Desktop Row
-                            const desktopRow = `
-                                <tr class="${rowClass} d-none d-md-table-row">
-                                    <td><span class="queue-badge ${isServed ? 'bg-secondary text-white' : ''}">${item.no_resep}</span></td>
-                                    <td>
-                                        <div class="d-flex flex-column">
-                                            <span class="fw-bold ${isServed ? 'text-muted' : 'text-dark'}">${item.nm_pasien}</span>
-                                            <small class="text-muted" style="font-size: 0.75rem;"><i class="fa fa-id-card me-1"></i> ${item.no_rawat}</small>
-                                        </div>
-                                    </td>
-                                    <td><span class="fw-semibold ${isServed ? 'text-muted' : 'text-secondary'}">${item.nm_poli}</span></td>
-                                    <td><span class="status-badge ${isServed ? 'bg-secondary text-white' : badgeClass}">${item.jenis_resep}</span></td>
-                                    <td>${item.jam_peresepan}</td>
-                                    <td>${item.jam}</td>
-                                    <td>${isServed ? item.jam_penyerahan : '-'}</td>
-                                    <td class="text-end">
-                                        <button class="btn btn-modern btn-info btn-sm text-white" onclick="callPatient('${item.no_resep}', '${item.nm_pasien.replace(/'/g, "\\'")}', '${item.nm_poli}', '${item.no_rawat}', '${item.no_resep_full}')">
-                                            <i class="fa fa-volume-up"></i>
-                                        </button>
-                                        <button class="btn btn-modern btn-dark btn-sm" onclick="handlePrint('${item.no_resep}', '${item.nm_pasien.replace(/'/g, "\\'")}', '${item.nm_poli}', '${item.no_rawat}')">
-                                            <i class="fa fa-print"></i> Cetak
-                                        </button>
-                                        <button class="btn btn-modern btn-sm ${isServed ? 'btn-secondary disabled' : 'btn-done'}" ${btnDoneAction}>
-                                            ${isServed ? 'Selesai' : 'Selesai'}
-                                        </button>
-                                    </td>
-                                </tr>
-                            `;
-                            
-                            // Mobile Card
-                            const mobileCard = `
-                                <tr class="d-md-none border-0 bg-transparent shadow-none p-0 mb-3">
-                                    <td colspan="8" class="p-0 border-0 bg-transparent">
-                                        <div class="card mb-3 shadow-sm border-0 overflow-hidden">
-                                            <div class="card-header-mobile">
-                                                <span class="fw-bold text-primary" style="font-size: 1.2rem;">${item.no_resep}</span>
-                                                <span class="status-badge ${badgeClass}" style="font-size: 0.7rem;">${item.jenis_resep}</span>
-                                            </div>
-                                            <div class="card-body-mobile">
-                                                <div class="info-row">
-                                                    <span class="info-label">Pasien</span>
-                                                    <span class="info-value text-truncate" style="max-width: 150px;">${item.nm_pasien}</span>
-                                                </div>
-                                                <div class="info-row">
-                                                    <span class="info-label">No. RM</span>
-                                                    <span class="info-value">${item.no_rawat}</span>
-                                                </div>
-                                                <div class="info-row">
-                                                    <span class="info-label">Poli</span>
-                                                    <span class="info-value">${item.nm_poli}</span>
-                                                </div>
-                                            </div>
-                                            <div class="card-footer-mobile">
-                                                <div class="action-bar">
-                                                    <button class="btn-action-mobile btn-call" onclick="callPatient('${item.no_resep}', '${item.nm_pasien.replace(/'/g, "\\'")}', '${item.nm_poli}', '${item.no_rawat}', '${item.no_resep_full}')">
-                                                        <i class="fa fa-volume-up"></i>
-                                                    </button>
-                                                    <button class="btn-action-mobile btn-print-mobile" onclick="handlePrint('${item.no_resep}', '${item.nm_pasien.replace(/'/g, "\\'")}', '${item.nm_poli}', '${item.no_rawat}')">
-                                                        <i class="fa fa-print"></i>
-                                                    </button>
-                                                    <button class="btn-action-mobile ${btnDoneState}" ${btnDoneAction}>
-                                                        ${btnDoneText}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `;
-
-                            tbody.append(desktopRow + mobileCard);
-                        });
-                    } else {
-                        tbody.append(`
-                            <tr>
-                                <td colspan="8" class="text-center py-5">
-                                    <div class="d-flex flex-column align-items-center justify-content-center">
-                                        <div style="background: #e0f7fa; padding: 20px; border-radius: 50%; margin-bottom: 15px;">
-                                            <i class="fa fa-clipboard-check fa-3x text-info"></i>
-                                        </div>
-                                        <h5 class="text-muted fw-bold">Tidak ada antrian saat ini</h5>
-                                    </div>
-                                </td>
-                            </tr>
-                        `);
-                    }
-                    
-                    $('#total-antrian').text(total);
-                    $('#total-racikan').text(racikan);
-                    $('#total-nonracikan').text(nonracikan);
+                    allPatients = data || []; // Ensure it's an array
+                    filterData(); // This will call renderTable with current filter
                 },
-                error: function() {
-                    $('#table-antrian tbody').html('<tr><td colspan="6" class="text-center text-danger py-4">Gagal terhubung ke server.</td></tr>');
+                error: function(xhr, status, error) {
+                    console.error("Error loading data:", error);
+                    $('#table-antrian tbody').html('<tr><td colspan="8" class="text-center text-danger py-4">Gagal memuat data. Silahkan refresh halaman.</td></tr>');
                 }
             });
+        }
+
+        function renderTable(data) {
+            const tbody = $('#table-antrian tbody');
+            tbody.empty();
+            
+            // Calculate stats from ALL patients (not filtered)
+            let statsTotal = 0, statsRacikan = 0, statsNonracikan = 0;
+            if (allPatients && Array.isArray(allPatients)) {
+                allPatients.forEach(item => {
+                     const isServed = item.jam_penyerahan && item.jam_penyerahan !== '00:00:00';
+                     if (!isServed) {
+                        statsTotal++;
+                        if(item.jenis_resep === 'Racikan') statsRacikan++; else statsNonracikan++;
+                     }
+                });
+            }
+            
+            $('#total-antrian').text(statsTotal);
+            $('#total-racikan').text(statsRacikan);
+            $('#total-nonracikan').text(statsNonracikan);
+
+            if (data && data.length > 0) {
+                data.forEach(item => {
+                    const isServed = item.jam_penyerahan && item.jam_penyerahan !== '00:00:00';
+                    
+                    const badgeClass = item.jenis_resep === 'Racikan' ? 'status-racikan' : 'status-nonracikan';
+                    const rowClass = isServed ? 'bg-light text-muted' : '';
+                    const btnDoneState = isServed ? 'btn-disabled' : 'btn-done-mobile';
+                    const btnDoneText = isServed ? '<i class="fa fa-check-double"></i>' : '<i class="fa fa-check"></i> Selesai';
+                    const btnDoneAction = isServed ? '' : `onclick="markAsDone('${item.no_resep_full}', '${item.nm_pasien.replace(/'/g, "\\'")}')"`;
+                    
+                    // Desktop Row
+                    const desktopRow = `
+                        <tr class="${rowClass} d-none d-md-table-row">
+                            <td><span class="queue-badge ${isServed ? 'bg-secondary text-white' : ''}">${item.no_resep}</span></td>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold ${isServed ? 'text-muted' : 'text-dark'}">${item.nm_pasien}</span>
+                                    <small class="text-muted" style="font-size: 0.75rem;"><i class="fa fa-id-card me-1"></i> ${item.no_rawat}</small>
+                                </div>
+                            </td>
+                            <td><span class="fw-semibold ${isServed ? 'text-muted' : 'text-secondary'}">${item.nm_poli}</span></td>
+                            <td><span class="status-badge ${isServed ? 'bg-secondary text-white' : badgeClass}">${item.jenis_resep}</span></td>
+                            <td>${item.jam_peresepan}</td>
+                            <td>${item.jam}</td>
+                            <td>${isServed ? item.jam_penyerahan : '-'}</td>
+                            <td class="text-end">
+                                <button class="btn btn-modern btn-info btn-sm text-white" onclick="callPatient('${item.no_resep}', '${item.nm_pasien.replace(/'/g, "\\'")}', '${item.nm_poli}', '${item.no_rawat}', '${item.no_resep_full}')">
+                                    <i class="fa fa-volume-up"></i>
+                                </button>
+                                <button class="btn btn-modern btn-dark btn-sm" onclick="handlePrint('${item.no_resep}', '${item.nm_pasien.replace(/'/g, "\\'")}', '${item.nm_poli}', '${item.no_rawat}')">
+                                    <i class="fa fa-print"></i> Cetak
+                                </button>
+                                <button class="btn btn-modern btn-sm ${isServed ? 'btn-secondary disabled' : 'btn-done'}" ${btnDoneAction}>
+                                    ${isServed ? 'Selesai' : 'Selesai'}
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    
+                    // Mobile Card
+                    const mobileCard = `
+                        <tr class="d-md-none border-0 bg-transparent shadow-none p-0 mb-3">
+                            <td colspan="8" class="p-0 border-0 bg-transparent">
+                                <div class="card mb-3 shadow-sm border-0 overflow-hidden">
+                                    <div class="card-header-mobile">
+                                        <span class="fw-bold text-primary" style="font-size: 1.2rem;">${item.no_resep}</span>
+                                        <span class="status-badge ${badgeClass}" style="font-size: 0.7rem;">${item.jenis_resep}</span>
+                                    </div>
+                                    <div class="card-body-mobile">
+                                        <div class="info-row">
+                                            <span class="info-label">Pasien</span>
+                                            <span class="info-value text-truncate" style="max-width: 150px;">${item.nm_pasien}</span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">No. RM</span>
+                                            <span class="info-value">${item.no_rawat}</span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Poli</span>
+                                            <span class="info-value">${item.nm_poli}</span>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer-mobile">
+                                        <div class="action-bar">
+                                            <button class="btn-action-mobile btn-call" onclick="callPatient('${item.no_resep}', '${item.nm_pasien.replace(/'/g, "\\'")}', '${item.nm_poli}', '${item.no_rawat}', '${item.no_resep_full}')">
+                                                <i class="fa fa-volume-up"></i>
+                                            </button>
+                                            <button class="btn-action-mobile btn-print-mobile" onclick="handlePrint('${item.no_resep}', '${item.nm_pasien.replace(/'/g, "\\'")}', '${item.nm_poli}', '${item.no_rawat}')">
+                                                <i class="fa fa-print"></i>
+                                            </button>
+                                            <button class="btn-action-mobile ${btnDoneState}" ${btnDoneAction}>
+                                                ${btnDoneText}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    
+                    tbody.append(desktopRow + mobileCard);
+                });
+            } else {
+                tbody.html(`
+                    <tr>
+                        <td colspan="8" class="text-center py-5">
+                            <div class="d-flex flex-column align-items-center justify-content-center">
+                                <div style="background: #e0f7fa; padding: 20px; border-radius: 50%; margin-bottom: 15px;">
+                                    <i class="fa fa-clipboard-check fa-3x text-info"></i>
+                                </div>
+                                <h5 class="text-muted fw-bold">Tidak ada antrian yang cocok</h5>
+                            </div>
+                        </td>
+                    </tr>
+                `);
+            }
         }
 
         function callPatient(noResep, namaPasien, poli, noRawat, noResepFull) {
