@@ -547,7 +547,7 @@
     </footer>
 
     <!-- Hidden Print Area -->
-    <!-- <div id="print-area">
+    <div id="print-area">
         <div class="ticket-header" id="print-rs-name">RUMAH SAKIT</div>
         <div class="ticket-body">
             <div style="font-size: 14px; margin-bottom: 5px;">NOMOR ANTRIAN</div>
@@ -562,7 +562,7 @@
             </div>
             <div class="ticket-footer">Silahkan menunggu panggilan.<br>Semoga lekas sembuh.</div>
         </div>
-    </div> -->
+    </div> 
 
     <!-- Scripts -->
     <script src="assets/vendor/libs/jquery/jquery.js"></script>
